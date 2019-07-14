@@ -1,6 +1,8 @@
 import numpy as np
 import datetime
 from scipy.optimize import least_squares as lsq
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 
 # square wave function
 
@@ -38,10 +40,11 @@ class schedule:
     def setToffset(self, t):
         self.toffset = t
 
-    def finalize(self):
+    def finalize(self, dump=False):
         self.times = np.zeros((self.nzones, 2))
         for (i,zone) in enumerate(self.zoneList):
-            print(zone)
+            if dump:
+                print(zone)
             self.times[i, 0] = zone[0].timestamp()
             self.times[i, 1] = self.times[i, 0] + zone[1]*60.0  # zone[1] is in minutes
 
@@ -82,14 +85,14 @@ class model:
         self.sliceList.append(np.s_[i:j])
         if self.nsched == 0:
             self.lowerBounds = np.zeros((j-i))
-            self.lowerBounds[j-1] = 0 # -np.inf
+            self.lowerBounds[j-1] = -1 # sec
             self.upperBounds = np.repeat(np.inf, j-i)
-            self.upperBounds[j-1] = 0.001
+            self.upperBounds[j-1] = 1 # sec
         else:
             self.lowerBounds = np.hstack((self.lowerBounds, np.zeros((j-i))))
-            self.lowerBounds[j-1] = 0 # -np.inf
+            self.lowerBounds[j-1] = -1 # sec
             self.upperBounds = np.hstack((self.upperBounds, np.repeat(np.inf, j-i)))
-            self.upperBounds[j-1] = 0.001
+            self.upperBounds[j-1] = 1 # sec
         self.indxStart += sched.nzones + 1
         self.nsched += 1
         self.nFlows += sched.nzones
@@ -127,12 +130,27 @@ def findFlows(flowModel, flowMeasurements):
     plotResids = formatResids(flowMeasurements, result.fun)
     return result
 
-def printResult(result, flowModel):
+def printResult(result, flowModel, plot=False):
     flows = result.x
+    if plot:
+        xpos = 0.6
+        ypos = 0.85
+        font = FontProperties()
+        font.set_size(6)
     for (i,sched) in enumerate(flowModel.schedList):
         schedFlows = flows[flowModel.sliceList[i]]
         for j in range(sched.nzones):
-            print('{} :\t {:.3f} gpm'.format(sched.zoneList[j][2], schedFlows[j]*60))
-        print('timeOffset: {:.1f} sec\n'.format(schedFlows[j+1]))
+            text = '{} :\t {:.3f} gpm'.format(sched.zoneList[j][2], schedFlows[j]*60)
+            if plot:
+                plt.figtext(xpos, ypos, text, fontproperties=font)
+                ypos -= 0.025
+            else:
+                print(text)
+        text = 'timeOffset: {:.1f} sec'.format(schedFlows[j+1])
+        if plot:
+            plt.figtext(xpos, ypos, text, fontproperties=font)
+            ypos -= 0.025
+        else:
+            print(text)
         
         

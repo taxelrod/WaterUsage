@@ -13,7 +13,6 @@ def loadHydraData(inputFileName, controllerId, checkDate=None):
     sched = schedule(controllerId)
 
     for zone in zoneList:
-        print(zone)
         ws = wb[zone]
         assert(ws['A1'].value == 'Date')
         assert(ws['B1'].value == 'Time')
