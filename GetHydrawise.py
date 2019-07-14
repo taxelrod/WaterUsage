@@ -88,10 +88,16 @@ def listChildElements(el):
         
 if __name__ == '__main__':
 
-    baseDir = '/home/tsa/Dropbox/WaterUsage/HydrawiseData'
+    baseDir = '/home/tsa/Dropbox/WaterUsageData/Hydrawise'
     todayString = date.today().isoformat()
     destDir = os.path.join(baseDir, todayString)
     if not os.path.exists(destDir):
         os.makedirs(destDir)
     getHydrawiseData(destDir)
+    #
+    # convert .xls from Hydrawise to .xslx for ProcessHydrawiseData
+    #
+    xlsFile = os.path.join(destDir, 'hydrawise-Watering\ Time\ \(min\).xls')
+    cmd = 'libreoffice "-env:UserInstallation=file:///tmp/LibO_Conversion" --headless --invisible --convert-to xlsx {} --outdir {}'.format(xlsFile, destDir)
+    os.system(cmd)
     

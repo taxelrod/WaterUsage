@@ -71,7 +71,7 @@ def getFloData(outFileDir):
 
 if __name__ == '__main__':
 
-    baseDir = '/home/tsa/Dropbox/WaterUsage/Data'
+    baseDir = '/home/tsa/Dropbox/WaterUsageData/Flo'
     todayString = date.today().isoformat()
     destDir = os.path.join(baseDir, todayString)
     if not os.path.exists(destDir):
