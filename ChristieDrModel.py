@@ -14,12 +14,6 @@ import sys
 
 def getZoneFlows(model, measFlows):
 
-    # Construct the model
-
-    model.addSched(HydraSched)
-    model.addSched(RearSched)
-    model.addSched(ConstLeakSched)
-
     # Solve the model for the zone flows
 
     result=wm.findFlows(model, measFlows)
@@ -32,11 +26,13 @@ def printResult(result, model, full=False):
         print(result)
     wm.printResult(result, model)
 
-def plotResids(result, model, measFlows, timeDateString):
+def plotResids(result, model, measFlows, timeDateString, pp):
 
     resids = wm.formatResids(measFlows, result.fun)
     plt.figure()
     plt.plot(resids[:,0], resids[:,1], '.')
+
+    plt.plot(resids[:,0], measFlows[:,1])
 
     flowTimes = measFlows[:,0]
     flows = result.x
@@ -54,9 +50,8 @@ def plotResids(result, model, measFlows, timeDateString):
     plt.yscale('symlog')
     plt.xlim(4.0, 8.0)
     plt.title(timeDateString)
-    pp=PdfPages('{}.pdf'.format(timeDateString))
+
     plt.savefig(pp, format='pdf')
-    pp.close()
 
 
 if __name__ == '__main__':
@@ -92,13 +87,24 @@ if __name__ == '__main__':
     floDataFile = os.path.join(dataDir, 'Flo', testDateString, 'total-consumption-last-day.csv')
     measFlows=pf.loadFloData(floDataFile)
 
+    # Construct the model
+
+    model.addSched(HydraSched)
+    model.addSched(RearSched)
+    model.addSched(ConstLeakSched)
+
     # Calculate the flows and print results
 
-    result = getZoneFlows(model, measFlows)
+    pp=PdfPages('{}.pdf'.format(testDateString))
 
-    printResult(result, model, full=False)
+    for n in range(5):
+        result = getZoneFlows(model, measFlows)
 
-    plotResids(result, model, measFlows, testDateString)
+        printResult(result, model, full=False)
+
+        plotResids(result, model, measFlows, testDateString, pp)
+
+    pp.close()
 
     
 

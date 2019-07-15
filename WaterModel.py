@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import ranf
 import datetime
 from scipy.optimize import least_squares as lsq
 import matplotlib.pyplot as plt
@@ -85,14 +86,14 @@ class model:
         self.sliceList.append(np.s_[i:j])
         if self.nsched == 0:
             self.lowerBounds = np.zeros((j-i))
-            self.lowerBounds[j-1] = -1 # sec
+            self.lowerBounds[j-1] = -10 # sec
             self.upperBounds = np.repeat(np.inf, j-i)
-            self.upperBounds[j-1] = 1 # sec
+            self.upperBounds[j-1] = 10 # sec
         else:
             self.lowerBounds = np.hstack((self.lowerBounds, np.zeros((j-i))))
-            self.lowerBounds[j-1] = -1 # sec
+            self.lowerBounds[j-1] = -10 # sec
             self.upperBounds = np.hstack((self.upperBounds, np.repeat(np.inf, j-i)))
-            self.upperBounds[j-1] = 1 # sec
+            self.upperBounds[j-1] = 10 # sec
         self.indxStart += sched.nzones + 1
         self.nsched += 1
         self.nFlows += sched.nzones
@@ -125,7 +126,7 @@ def formatResids(flowMeasurements, resids):
     return fResids
 
 def findFlows(flowModel, flowMeasurements):
-    flowGuess = 0.0005*np.ones((flowModel.nFlows + flowModel.nsched)) # includes timeoffsets
+    flowGuess = 0.1 + 5.0*ranf(flowModel.nFlows + flowModel.nsched) # includes timeoffsets
     result = lsq(optFunc, flowGuess, bounds=(flowModel.lowerBounds, flowModel.upperBounds), args=(flowMeasurements, flowModel))
     plotResids = formatResids(flowMeasurements, result.fun)
     return result
