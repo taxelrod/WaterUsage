@@ -65,6 +65,14 @@ class schedule:
 
         return flowIntegral
 
+    def schedFlow(self, zoneFlows, tArray):
+        schedFlow = np.zeros_like(tArray)
+        for i in range(len(tArray)):
+            schedFlow[i] = self.flow(zoneFlows, tArray[i])
+
+        return schedFlow
+        
+
 """
 optFunc takes as input an array of flow rates, which is the concatenation of flow rates for each of the schedules.  
 The timeseries of measured flows, F, is the first and only argument, passed from least_squares() as args=F
@@ -86,14 +94,14 @@ class model:
         self.sliceList.append(np.s_[i:j])
         if self.nsched == 0:
             self.lowerBounds = np.zeros((j-i))
-            self.lowerBounds[j-1] = -10 # sec
+            self.lowerBounds[j-1] = -15*60 # sec
             self.upperBounds = np.repeat(np.inf, j-i)
-            self.upperBounds[j-1] = 10 # sec
+            self.upperBounds[j-1] = 15*60 # sec
         else:
             self.lowerBounds = np.hstack((self.lowerBounds, np.zeros((j-i))))
-            self.lowerBounds[j-1] = -10 # sec
+            self.lowerBounds[j-1] = -15*60 # sec
             self.upperBounds = np.hstack((self.upperBounds, np.repeat(np.inf, j-i)))
-            self.upperBounds[j-1] = 10 # sec
+            self.upperBounds[j-1] = 15*60 # sec
         self.indxStart += sched.nzones + 1
         self.nsched += 1
         self.nFlows += sched.nzones
@@ -127,13 +135,13 @@ def formatResids(flowMeasurements, resids):
 
 def findFlows(flowModel, flowMeasurements):
     flowGuess = 0.1 + 5.0*ranf(flowModel.nFlows + flowModel.nsched) # includes timeoffsets
-    result = lsq(optFunc, flowGuess, bounds=(flowModel.lowerBounds, flowModel.upperBounds), args=(flowMeasurements, flowModel))
+    result = lsq(optFunc, flowGuess, bounds=(flowModel.lowerBounds, flowModel.upperBounds), loss='huber',args=(flowMeasurements, flowModel))
     plotResids = formatResids(flowMeasurements, result.fun)
     return result
 
-def printResult(result, flowModel, plot=False):
+def printResult(result, flowModel, plotLegend=False):
     flows = result.x
-    if plot:
+    if plotLegend:
         xpos = 0.6
         ypos = 0.85
         font = FontProperties()
@@ -142,13 +150,13 @@ def printResult(result, flowModel, plot=False):
         schedFlows = flows[flowModel.sliceList[i]]
         for j in range(sched.nzones):
             text = '{} :\t {:.3f} gpm'.format(sched.zoneList[j][2], schedFlows[j]*60)
-            if plot:
+            if plotLegend:
                 plt.figtext(xpos, ypos, text, fontproperties=font)
                 ypos -= 0.025
             else:
                 print(text)
         text = 'timeOffset: {:.1f} sec'.format(schedFlows[j+1])
-        if plot:
+        if plotLegend:
             plt.figtext(xpos, ypos, text, fontproperties=font)
             ypos -= 0.025
         else:

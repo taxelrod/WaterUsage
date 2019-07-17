@@ -24,7 +24,7 @@ def printResult(result, model, full=False):
 
     if full:
         print(result)
-    wm.printResult(result, model)
+    wm.printResult(result, model, plotLegend=False)
 
 def plotResids(result, model, measFlows, timeDateString, pp):
 
@@ -46,7 +46,33 @@ def plotResids(result, model, measFlows, timeDateString, pp):
             flowPredict[i] = sched.flowIntegral(zoneFlows, flowTimes[i], flowTimes[i+1])
         plt.plot(resids[:,0], flowPredict)
 
-    wm.printResult(result, model, plot=True)
+    wm.printResult(result, model, plotLegend=True)
+    plt.yscale('symlog')
+    plt.xlim(4.0, 8.0)
+    plt.title(timeDateString)
+
+    plt.savefig(pp, format='pdf')
+
+def plotScheds(result, model, measFlows, timeDateString, pp):
+
+    flowTimes = measFlows[:,0]
+    plotTimes = np.arange(np.amin(flowTimes), np.amax(flowTimes), 10.0)
+    plotHours = np.zeros_like(plotTimes)
+    for i in range(len(plotTimes)):
+        t = dt.datetime.fromtimestamp(plotTimes[i])
+        plotHours[i] = t.time().hour + t.time().minute/60.0
+
+    plt.figure()
+
+    flows = result.x
+    for (i, sched) in enumerate(model.schedList):
+        parameterBlock = flows[model.sliceList[i]]
+        zoneFlows = parameterBlock[0:sched.nzones]
+        tOffset = parameterBlock[-1]
+        sched.setToffset(tOffset)
+        schedFlow = sched.schedFlow(zoneFlows, plotTimes)
+        plt.plot(plotHours, schedFlow, '.', markersize=1)
+
     plt.yscale('symlog')
     plt.xlim(4.0, 8.0)
     plt.title(timeDateString)
@@ -63,7 +89,7 @@ if __name__ == '__main__':
     # Schedule constant over 24 hours, representing a fixed leak
 
     ConstLeakSched = wm.schedule(3)
-    ConstLeakSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('00:00','%H:%M').time()), 24*60.0-1, 'Const Leak')
+    ConstLeakSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('04:45','%H:%M').time()), 1.75*60.0, 'Const Leak')
     ConstLeakSched.finalize()
 
     # This is the fixed schedule (except for clock drift) for
@@ -101,8 +127,8 @@ if __name__ == '__main__':
         result = getZoneFlows(model, measFlows)
 
         printResult(result, model, full=False)
-
         plotResids(result, model, measFlows, testDateString, pp)
+        plotScheds(result, model, measFlows, testDateString, pp)
 
     pp.close()
 
