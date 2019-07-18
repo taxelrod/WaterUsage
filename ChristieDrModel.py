@@ -7,10 +7,11 @@ import ProcessHydrawiseData as ph
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib.backends.backend_pdf import PdfPages
+from scipy.stats import median_absolute_deviation as mad
 import numpy as np
 import os
 import sys
-
+import argparse
 
 def getZoneFlows(model, measFlows):
 
@@ -81,12 +82,36 @@ def plotScheds(result, model, measFlows, timeDateString, pp):
 
 
 if __name__ == '__main__':
-    testDateString = sys.argv[1]
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('date', help = 'date as 20yy-mm-dd')
+    parser.add_argument('--plot', help = 'output plots to a pdf file named {date}.pdf', action='store_true')
+    parser.add_argument('--print', help = 'print results of each trial', action='store_true')
+    parser.add_argument('--dataDir', help = 'directory root for Flo and Hydrawise data')
+    parser.add_argument('--nTrials', help = 'number of solutions from random initial guesses on which to base statistics', type=int)
+    args = parser.parse_args()
+
+    print('plot: ',args.plot)
+    
+    testDateString = args.date
     testDate = dt.datetime.strptime(testDateString, '%Y-%m-%d')
 
-    dataDir = '/home/tsa/Dropbox/WaterUsageData'
+    if args.dataDir:
+        dataDir = args.dataDir
+    else:
+        dataDir = '/home/tsa/Dropbox/WaterUsageData'
+
+    print('datadir: ', dataDir)
+
+    if args.nTrials:
+        nTrials = args.nTrials
+    else:
+        nTrials = 5
+
+    print('nTrials: ', nTrials)
 
     # Schedule constant over 24 hours, representing a fixed leak
+    # Currently set to reflect the fact that we turn the system on and off daily to minimize the leak...
 
     ConstLeakSched = wm.schedule(3)
     ConstLeakSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('04:45','%H:%M').time()), 1.75*60.0, 'Const Leak')
@@ -121,16 +146,34 @@ if __name__ == '__main__':
 
     # Calculate the flows and print results
 
-    pp=PdfPages('{}.pdf'.format(testDateString))
+    if args.plot:
+        pp=PdfPages('{}.pdf'.format(testDateString))
 
-    for n in range(5):
+    resultArr = np.zeros((nTrials, model.nFlows + model.nsched))
+    
+    for n in range(nTrials):
         result = getZoneFlows(model, measFlows)
 
-        printResult(result, model, full=False)
-        plotResids(result, model, measFlows, testDateString, pp)
-        plotScheds(result, model, measFlows, testDateString, pp)
+        resultArr[n, :] = result.x
+        resultArr[n, :-1] *= 60.0  # gps to gpm
 
-    pp.close()
+        if args.print:
+            printResult(result, model, full=False)
+        if args.plot:
+            plotResids(result, model, measFlows, testDateString, pp)
+            plotScheds(result, model, measFlows, testDateString, pp)
+
+    if args.plot:
+        pp.close()
+
+    if args.print:
+        print(resultArr)
+
+    meds = np.median(resultArr, axis=0)
+    mads = mad(resultArr, axis=0)
+
+    for n in range(len(meds)):
+        print(n, meds[n], mads[n])
 
     
 
