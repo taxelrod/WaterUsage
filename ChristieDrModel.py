@@ -88,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot', help = 'output plots to a pdf file named {date}.pdf', action='store_true')
     parser.add_argument('--print', help = 'print results of each trial', action='store_true')
     parser.add_argument('--dataDir', help = 'directory root for Flo and Hydrawise data')
+    parser.add_argument('--dataOut', help = 'file to append output data')
     parser.add_argument('--nTrials', help = 'number of solutions from random initial guesses on which to base statistics', type=int)
     args = parser.parse_args()
 
@@ -144,6 +145,13 @@ if __name__ == '__main__':
     model.addSched(RearSched)
     model.addSched(ConstLeakSched)
 
+    flowLabels = []
+    for sched in model.schedList:
+        for zone in sched.zoneList:
+            flowLabels.append(zone[2].translate({ord(' '):None}))
+        flowLabels.append('toffset')
+    
+
     # Calculate the flows and print results
 
     if args.plot:
@@ -173,7 +181,24 @@ if __name__ == '__main__':
     mads = mad(resultArr, axis=0)
 
     for n in range(len(meds)):
-        print(n, meds[n], mads[n])
+        print(flowLabels[n], meds[n], mads[n])
+
+    if args.dataOut:
+        # check for existence.  if exists just append line.  if not, put out header line first
+        if os.path.exists(args.dataOut):
+            df = open(args.dataOut,'a')
+        else:
+            df = open(args.dataOut,'w')
+            print('# time', end=' ', file=df)
+            for label in flowLabels:
+                print(label, 'sigma_'+label, end=' ', file=df)
+            print('', file=df)
+        print(testDate.timestamp(), end=' ', file=df)
+        for n in range(len(meds)):
+            print(meds[n], mads[n], end=' ', file=df)
+        print('', file=df)
+        df.close()
+        
 
     
 
