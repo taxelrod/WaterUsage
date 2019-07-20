@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import median_absolute_deviation as mad
+from collections import OrderedDict
 import numpy as np
 import os
 import sys
@@ -111,20 +112,23 @@ if __name__ == '__main__':
 
     print('nTrials: ', nTrials)
 
+    # ------------------------------------
+    # Set up schedules, variable and fixed
+    
     # Schedule constant over 24 hours, representing a fixed leak
     # Currently set to reflect the fact that we turn the system on and off daily to minimize the leak...
 
     ConstLeakSched = wm.schedule(3)
-    ConstLeakSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('04:45','%H:%M').time()), 1.75*60.0, 'Const Leak')
+    ConstLeakSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('00:00','%H:%M').time()), 23.95*60.0, 'Const Leak')
     ConstLeakSched.finalize()
 
     # This is the fixed schedule (except for clock drift) for
     # the irrigation controller in the rear of the house
 
     RearSched = wm.schedule(2)
-    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('05:30','%H:%M').time()), 10.0, 'Lawn')
-    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('05:40','%H:%M').time()), 15.0, 'Fruit Trees')
-    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('05:55','%H:%M').time()), 5.0, 'Planter')
+    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:45,'%H:%M').time()), 10.0, 'Lawn')
+    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:55','%H:%M').time()), 15.0, 'Fruit Trees')
+    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('07:10','%H:%M').time()), 5.0, 'Planter')
     RearSched.finalize()
 
     # Read in the Hydrawise schedule for testDate
@@ -133,23 +137,26 @@ if __name__ == '__main__':
     hydraDatafile = os.path.join(dataDir, 'Hydrawise', testDateString, 'hydrawise-Watering Time (min).xlsx')
     HydraSched = ph.loadHydraData(hydraDatafile, 1, checkDate=testDate)
 
-    model = wm.model()
-
     # Read in the Flo data
     floDataFile = os.path.join(dataDir, 'Flo', testDateString, 'total-consumption-last-day.csv')
     measFlows=pf.loadFloData(floDataFile)
 
+    # Data structure for all flows, both active and inactive
+
+    flowData = OrderedDict([('FrontOrangeMesquite',(0, 0)), ('NorthHillside',(0, 0)), ('SouthHillside',(0, 0)), ('EastPlanter',(0, 0)), ('SouthPalm',(0, 0)), ('Lawn',(0, 0)), ('FruitTrees',(0, 0)), ('Planter',(0, 0)), ('ConstLeak',(0, 0))])
     # Construct the model
+
+    model = wm.model()
 
     model.addSched(HydraSched)
     model.addSched(RearSched)
     model.addSched(ConstLeakSched)
 
-    flowLabels = []
+    activeFlowLabels = []
     for sched in model.schedList:
         for zone in sched.zoneList:
-            flowLabels.append(zone[2].translate({ord(' '):None}))
-        flowLabels.append('toffset')
+            activeFlowLabels.append(zone[2].translate({ord(' '):None}))
+        activeFlowLabels.append('toffset')
     
 
     # Calculate the flows and print results
@@ -181,7 +188,7 @@ if __name__ == '__main__':
     mads = mad(resultArr, axis=0)
 
     for n in range(len(meds)):
-        print(flowLabels[n], meds[n], mads[n])
+        print(activeFlowLabels[n], meds[n], mads[n])
 
     if args.dataOut:
         # check for existence.  if exists just append line.  if not, put out header line first
@@ -190,12 +197,16 @@ if __name__ == '__main__':
         else:
             df = open(args.dataOut,'w')
             print('# time', end=' ', file=df)
-            for label in flowLabels:
+            for label in flowData:
                 print(label, 'sigma_'+label, end=' ', file=df)
             print('', file=df)
         print(testDate.timestamp(), end=' ', file=df)
         for n in range(len(meds)):
-            print(meds[n], mads[n], end=' ', file=df)
+            if flowData.get(activeFlowLabels[n]):
+                flowData[activeFlowLabels[n]] = (meds[n], mads[n])
+        for flow in flowData:
+            median, sigma = flowData[flow]
+            print(median, sigma, end=' ', file=df)
         print('', file=df)
         df.close()
         
