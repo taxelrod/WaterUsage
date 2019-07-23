@@ -9,6 +9,11 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import median_absolute_deviation as mad
 from collections import OrderedDict
+import pickle
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+
 import numpy as np
 import os
 import sys
@@ -81,13 +86,64 @@ def plotScheds(result, model, measFlows, timeDateString, pp):
 
     plt.savefig(pp, format='pdf')
 
+def updateSheet(time, flowData):
+    # first part copied from Google sheet API quickstart.py
+
+    # If modifying these scopes, delete the file token.pickle.
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    service = build('sheets', 'v4', credentials=creds)
+
+    # with API ready to go connect to the spreadsheet, and append the data as a new row
+
+    valueList = [time]
+    for (n, flow) in enumerate(flowData):
+        median, sigma = flowData[flow]
+        valueList.append(median)
+        valueList.append(sigma)
+        
+    values = [ valueList ]
+    body = {
+        'values': values
+    }
+
+    range_name = 'Model Fit'
+    spreadsheet_id = '1-FtfW7MFWiklAmxRxKnFFz5JVYCY2C69jUHqWOSZxOU'
+    value_input_option = 'USER_ENTERED'
+    insert_data_option = 'INSERT_ROWS'
+    result = service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id, range=range_name, insertDataOption=insert_data_option,
+        valueInputOption=value_input_option, body=body).execute()
+
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('date', help = 'date as 20yy-mm-dd')
     parser.add_argument('--plot', help = 'output plots to a pdf file named {date}.pdf', action='store_true')
+    parser.add_argument('--csv', help = 'output data file specified by --dataOut in csv format', action='store_true')
     parser.add_argument('--print', help = 'print results of each trial', action='store_true')
+    parser.add_argument('--oldSched', help = 'use schedule from before 7/21/19 change', action='store_true')
+    parser.add_argument('--updateSheet', help = 'append results to Google sheet identified by environment variable $SHEET_ID' , action='store_true')
     parser.add_argument('--dataDir', help = 'directory root for Flo and Hydrawise data')
     parser.add_argument('--dataOut', help = 'file to append output data')
     parser.add_argument('--nTrials', help = 'number of solutions from random initial guesses on which to base statistics', type=int)
@@ -126,10 +182,16 @@ if __name__ == '__main__':
     # the irrigation controller in the rear of the house
 
     RearSched = wm.schedule(2)
-    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:45,'%H:%M').time()), 10.0, 'Lawn')
-    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:55','%H:%M').time()), 15.0, 'Fruit Trees')
-    RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('07:10','%H:%M').time()), 5.0, 'Planter')
-    RearSched.finalize()
+    if args.oldSched:
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('05:30','%H:%M').time()), 10.0, 'Lawn')
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('05:40','%H:%M').time()), 15.0, 'Fruit Trees')
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('05:55','%H:%M').time()), 5.0, 'Planter')
+        RearSched.finalize()
+    else:
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:45','%H:%M').time()), 10.0, 'Lawn')
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:55','%H:%M').time()), 15.0, 'Fruit Trees')
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('07:10','%H:%M').time()), 5.0, 'Planter')
+        RearSched.finalize()
 
     # Read in the Hydrawise schedule for testDate
     #
@@ -188,27 +250,54 @@ if __name__ == '__main__':
     mads = mad(resultArr, axis=0)
 
     for n in range(len(meds)):
-        print(activeFlowLabels[n], meds[n], mads[n])
+        if flowData.get(activeFlowLabels[n]):
+            flowData[activeFlowLabels[n]] = (meds[n], mads[n])
 
+    if args.updateSheet:
+        updateSheet(testDate.timestamp(), flowData)
+        
     if args.dataOut:
         # check for existence.  if exists just append line.  if not, put out header line first
         if os.path.exists(args.dataOut):
             df = open(args.dataOut,'a')
         else:
             df = open(args.dataOut,'w')
-            print('# time', end=' ', file=df)
-            for label in flowData:
-                print(label, 'sigma_'+label, end=' ', file=df)
+            if args.csv:
+                print('time', end=', ', file=df)
+                for (n, label) in enumerate(flowData):
+                    if n == len(flowData) - 1:
+                        endstr = ''
+                    else:
+                        endstr = ', '
+                    print(label, ', ', 'sigma_'+label, end=endstr, file=df)
+            else:
+                print('# time', end=' ', file=df)
+                for label in flowData:
+                    print(label, ' ', 'sigma_'+label, end=' ', file=df)
             print('', file=df)
-        print(testDate.timestamp(), end=' ', file=df)
-        for n in range(len(meds)):
-            if flowData.get(activeFlowLabels[n]):
-                flowData[activeFlowLabels[n]] = (meds[n], mads[n])
-        for flow in flowData:
+        if args.csv:
+            print(testDate.timestamp(), end=', ', file=df)
+        else:
+            print(testDate.timestamp(), end=' ', file=df)
+
+        for (n, flow) in enumerate(flowData):
             median, sigma = flowData[flow]
-            print(median, sigma, end=' ', file=df)
+            # if csv and last item, endstr = '', else endstr = ', '
+            if args.csv:
+                if n == len(flowData) - 1:
+                    endstr = ''
+                else:
+                    endstr = ', '
+                print('{:.3f}, {:.3f}'.format(median, sigma), end=endstr, file=df)
+            else:
+                print('{:.3f} {:.3f}'.format(median, sigma), end=' ', file=df)
         print('', file=df)
         df.close()
+    else:
+        for n in range(len(meds)):
+            print(activeFlowLabels[n], meds[n], mads[n])
+
+        
         
 
     
