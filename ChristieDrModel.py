@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import datetime as dt
+from datetime import date
 import WaterModel as wm
 import ProcessFloData as pf
 import ProcessHydrawiseData as ph
@@ -127,7 +128,7 @@ def updateSheet(time, flowData):
     }
 
     range_name = 'Model Fit'
-    spreadsheet_id = '1-FtfW7MFWiklAmxRxKnFFz5JVYCY2C69jUHqWOSZxOU'
+    spreadsheet_id = os.environ['CHRISTIE_WATER_DOC']
     value_input_option = 'USER_ENTERED'
     insert_data_option = 'INSERT_ROWS'
     result = service.spreadsheets().values().append(
@@ -138,7 +139,7 @@ def updateSheet(time, flowData):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('date', help = 'date as 20yy-mm-dd')
+    parser.add_argument('--date', help = 'date as 20yy-mm-dd')
     parser.add_argument('--plot', help = 'output plots to a pdf file named {date}.pdf', action='store_true')
     parser.add_argument('--csv', help = 'output data file specified by --dataOut in csv format', action='store_true')
     parser.add_argument('--print', help = 'print results of each trial', action='store_true')
@@ -151,7 +152,11 @@ if __name__ == '__main__':
 
     print('plot: ',args.plot)
     
-    testDateString = args.date
+    if args.date:
+        testDateString = args.date
+    else:
+        testDateString = date.today().isoformat()
+
     testDate = dt.datetime.strptime(testDateString, '%Y-%m-%d')
 
     if args.dataDir:
@@ -193,7 +198,7 @@ if __name__ == '__main__':
         RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('07:10','%H:%M').time()), 5.0, 'Planter')
         RearSched.finalize()
 
-    # Read in the Hydrawise schedule for testDate
+    # Read in the Hydrawise schedule for testDate.  NOTE - because it varies with the weather, it may be empty
     #
 
     hydraDatafile = os.path.join(dataDir, 'Hydrawise', testDateString, 'hydrawise-Watering Time (min).xlsx')
@@ -210,7 +215,8 @@ if __name__ == '__main__':
 
     model = wm.model()
 
-    model.addSched(HydraSched)
+    if HydraSched is not None:
+        model.addSched(HydraSched)
     model.addSched(RearSched)
     model.addSched(ConstLeakSched)
 
