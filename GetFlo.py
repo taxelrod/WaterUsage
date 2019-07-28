@@ -61,7 +61,12 @@ def getFloData(outFileDir):
     download_btn.click()
     
     dropdownItemList=browser.find_elements_by_class_name('dropdown-item')
-    csv_button = dropdownItemList[12]
+    if DEBUG:
+        for (i,item) in enumerate(dropdownItemList):
+            print(i, item.get_attribute('outerHTML'))
+            print(item.text)
+        
+    csv_button = dropdownItemList[14]
 
     assert(csv_button.text=='as CSV')
 
