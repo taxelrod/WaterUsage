@@ -66,7 +66,7 @@ def getFloData(outFileDir):
             print(i, item.get_attribute('outerHTML'))
             print(item.text)
         
-    csv_button = dropdownItemList[14]
+    csv_button = dropdownItemList[16]
 
     assert(csv_button.text=='as CSV')
 
