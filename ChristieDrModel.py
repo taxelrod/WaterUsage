@@ -122,6 +122,8 @@ def updateSheet(time, flowData):
         valueList.append(median)
         valueList.append(sigma)
         
+    valueList.append(dt.date.fromtimestamp(time).isoformat())
+    
     values = [ valueList ]
     body = {
         'values': values
@@ -195,8 +197,8 @@ if __name__ == '__main__':
         RearSched.finalize()
     else:
         RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:38','%H:%M').time()), 10.0, 'Lawn')
-        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:48','%H:%M').time()), 15.0, 'Fruit Trees')
-        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('07:03','%H:%M').time()), 5.0, 'Planter')
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('06:53','%H:%M').time()), 15.0, 'Fruit Trees')
+        RearSched.addZone(dt.datetime.combine(testDate, dt.datetime.strptime('07:08','%H:%M').time()), 5.0, 'Planter')
         RearSched.finalize()
 
     # Read in the Hydrawise schedule for testDate.  NOTE - because it varies with the weather, it may be empty
