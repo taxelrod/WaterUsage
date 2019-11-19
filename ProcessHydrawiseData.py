@@ -8,7 +8,7 @@ from WaterModel import schedule
 
 # spreadsheet may be empty.  In this case, there is a single sheet, 'Worksheet', and all cells are empty
 
-def loadHydraData(inputFileName, controllerId, checkDate=None):
+def loadHydraData(inputFileName, controllerId, checkDate):
     wb = load_workbook(inputFileName)
     zoneList = wb.sheetnames
 
@@ -17,19 +17,23 @@ def loadHydraData(inputFileName, controllerId, checkDate=None):
     for zone in zoneList:
         ws = wb[zone]
         if ws['A1'].value is None:  # check for empty
-            return None
+            continue
         
         assert(ws['A1'].value == 'Date')
         assert(ws['B1'].value == 'Time')
         assert(ws['C1'].value == 'min')
-
-        zoneStart = ws['B2'].value # datetime
-        zoneDuration = ws['C2'].value  # minutes
-        if checkDate is not None:
-            assert(zoneStart.date() == checkDate.date())
-
-        sched.addZone(zoneStart, zoneDuration, zone)
-
+        
+        for row in range(2, ws.max_row):
+            cellBId = 'B{}'.format(row)
+            cellCId = 'C{}'.format(row)
+            zoneStart = ws[cellBId].value # datetime
+            zoneDuration = ws[cellCId].value  # minutes
+            if zoneStart is None:
+                return None
+            if zoneStart.date() == checkDate.date():
+                sched.addZone(zoneStart, zoneDuration, zone)
+                break
+            
     sched.finalize()
 
     return sched
