@@ -29,9 +29,11 @@ def loadHydraData(inputFileName, controllerId, checkDate):
             zoneStart = ws[cellBId].value # datetime
             zoneDuration = ws[cellCId].value  # minutes
             if zoneStart is None:
-                return None
+                break
             if zoneStart.date() == checkDate.date():
-                sched.addZone(zoneStart, zoneDuration, zone)
+                if zoneDuration > 0:
+                    sched.addZone(zoneStart, zoneDuration, zone)
+                    print('Hydrawise added: ', zoneStart.date(), zoneDuration, zone)
                 break
             
     sched.finalize()
