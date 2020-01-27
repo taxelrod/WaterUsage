@@ -14,6 +14,8 @@ from selenium.webdriver import FirefoxProfile
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import pdb
+import time
 
 DEBUG = False
 
@@ -50,15 +52,22 @@ def getFloData(outFileDir):
         
     browser.get('https://user.meetflo.com/usage')
 
+    try:
+        element = WebDriverWait(browser, 10).until(
+            EC.title_is('Flo - Usage'))
+    finally:
+        pass
+
     assert(browser.title == 'Flo - Usage')
 
-    dropdownList=browser.find_elements_by_class_name('dropdown-toggle')
-    if DEBUG:
-        for (i,drop) in enumerate(dropdownList):
-            print(i, drop.get_attribute('outerHTML'))
-              
-    download_btn = dropdownList[3]
-    download_btn.click()
+    dataDownload = browser.find_element_by_class_name('data-download')
+#    pdb.set_trace()
+
+    # why this sleep should be necessary is a mystery
+    time.sleep(2)
+    
+    dataDownloadButton = dataDownload.find_element_by_class_name('dropdown-toggle')
+    dataDownloadButton.click()
     
     csv_button = None
     dropdownItemList=browser.find_elements_by_class_name('dropdown-item')
